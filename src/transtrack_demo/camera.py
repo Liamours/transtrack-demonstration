@@ -1,8 +1,21 @@
 import platform
 import subprocess
 
+from . import ui
 
-def list_camera_names():
+
+def _camera_names_from_directshow():
+    try:
+        from pygrabber.dshow_graph import FilterGraph
+    except Exception:
+        return []
+    try:
+        return FilterGraph().get_input_devices()
+    except Exception:
+        return []
+
+
+def _camera_names_from_windows():
     if platform.system() != "Windows":
         return []
 
@@ -25,17 +38,19 @@ def list_camera_names():
     return [line.strip() for line in result.stdout.splitlines() if line.strip()]
 
 
+def list_cameras():
+    names = _camera_names_from_directshow() or _camera_names_from_windows()
+    return [{"index": index, "name": name} for index, name in enumerate(names)]
+
+
+def camera_name(index):
+    for camera in list_cameras():
+        if camera["index"] == index:
+            return camera["name"]
+    return "Camera"
+
+
 def choose_camera():
-    names = list_camera_names()
-
-    print("\nTransTrack Live Fatigue Detection")
-    print("---------------------------------")
-    if names:
-        print("Detected cameras:")
-        for index, name in enumerate(names):
-            print(f"  [{index}] {name}")
-    else:
-        print("No camera names detected. Try index 0 first.")
-
-    raw = input("\nCamera index [0]: ").strip()
-    return int(raw) if raw else 0
+    cameras = list_cameras()
+    ui.camera_menu(cameras)
+    return ui.prompt_camera()

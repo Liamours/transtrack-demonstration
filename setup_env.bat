@@ -3,7 +3,7 @@ setlocal
 
 set ENV_NAME=transtrack_demo
 set PYTHON_VERSION=3.11
-set SOURCE_ROOT=C:\Users\lulay\Desktop\Activities\transtrack\transtrack-api
+if "%SOURCE_ROOT%"=="" set SOURCE_ROOT=%TRANSTRACK_API_ROOT%
 
 echo Creating conda environment: %ENV_NAME%
 call conda create -n %ENV_NAME% python=%PYTHON_VERSION% -y
@@ -17,13 +17,17 @@ echo Installing test dependencies...
 call conda run -n %ENV_NAME% pip install -r requirements-dev.txt
 if errorlevel 1 goto error
 
-echo Copying model files...
-if not exist models\classifier mkdir models\classifier
-if not exist models\mediapipe mkdir models\mediapipe
-copy /Y "%SOURCE_ROOT%\models\classifier\best_val_f1.pth" "models\classifier\best_val_f1.pth" >nul
-if errorlevel 1 goto error
-copy /Y "%SOURCE_ROOT%\models\mediapipe\face_landmarker.task" "models\mediapipe\face_landmarker.task" >nul
-if errorlevel 1 goto error
+if not "%SOURCE_ROOT%"=="" (
+    echo Copying model files...
+    if not exist models\classifier mkdir models\classifier
+    if not exist models\mediapipe mkdir models\mediapipe
+    copy /Y "%SOURCE_ROOT%\models\classifier\best_val_f1.pth" "models\classifier\best_val_f1.pth" >nul
+    if errorlevel 1 goto error
+    copy /Y "%SOURCE_ROOT%\models\mediapipe\face_landmarker.task" "models\mediapipe\face_landmarker.task" >nul
+    if errorlevel 1 goto error
+) else (
+    echo Model copy skipped. Set TRANSTRACK_API_ROOT or SOURCE_ROOT.
+)
 
 echo.
 echo Done.

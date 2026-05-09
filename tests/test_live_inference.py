@@ -8,14 +8,16 @@ from src.transtrack_demo import live_inference
 
 
 def test_save_clip_writes_all_frames(monkeypatch, tmp_path):
+    from src.transtrack_demo import inference_worker
+
     written = []
     writer = MagicMock()
     writer.write.side_effect = written.append
-    monkeypatch.setattr(live_inference.cv2, "VideoWriter", lambda *args: writer)
-    monkeypatch.setattr(live_inference.cv2, "VideoWriter_fourcc", lambda *args: 1234)
+    monkeypatch.setattr(inference_worker.cv2, "VideoWriter", lambda *args: writer)
+    monkeypatch.setattr(inference_worker.cv2, "VideoWriter_fourcc", lambda *args: 1234)
 
     frames = [np.zeros((8, 8, 3), dtype=np.uint8) for _ in range(3)]
-    live_inference.save_clip(tmp_path / "clip.mp4", frames, 10, (8, 8))
+    inference_worker.save_clip(tmp_path / "clip.mp4", frames, 10, (8, 8))
 
     assert len(written) == 3
     writer.release.assert_called_once()
@@ -41,7 +43,7 @@ def test_main_runs_inference_and_logs_without_real_camera(monkeypatch, tmp_path)
     monkeypatch.setattr(live_inference.cv2, "imshow", lambda *args: None)
     monkeypatch.setattr(live_inference.cv2, "waitKey", lambda delay: -1)
     monkeypatch.setattr(live_inference.cv2, "destroyAllWindows", lambda: None)
-    monkeypatch.setattr(live_inference, "save_clip", lambda *args: None)
+    monkeypatch.setattr(live_inference, "camera_name", lambda index: "Camera A")
 
     fake_pipeline = SimpleNamespace(
         predict=lambda clip_path, model_path: {
@@ -51,6 +53,30 @@ def test_main_runs_inference_and_logs_without_real_camera(monkeypatch, tmp_path)
         }
     )
     monkeypatch.setitem(sys.modules, "src.transtrack_demo.pipeline", fake_pipeline)
+    workers = []
+
+    class FakeWorker:
+        latest_result = None
+
+        def __init__(self, *args, **kwargs):
+            self.stopped = False
+            workers.append(self)
+
+        def start(self):
+            pass
+
+        def submit(self, frames):
+            self.latest_result = {
+                "label": "normal",
+                "confidence": 0.9,
+                "class_id": 1,
+            }
+            return True
+
+        def stop(self):
+            self.stopped = True
+
+    monkeypatch.setattr(live_inference, "InferenceWorker", FakeWorker)
     monkeypatch.setattr(
         live_inference,
         "parse_args",
@@ -68,6 +94,5 @@ def test_main_runs_inference_and_logs_without_real_camera(monkeypatch, tmp_path)
     live_inference.main()
 
     assert capture.release.called
-    rows = log_path.read_text().splitlines()
-    assert rows[0] == "timestamp,label,confidence,class_id"
-    assert len(rows) >= 2
+    assert workers[0].stopped is True
+    assert workers[0].latest_result["label"] == "normal"

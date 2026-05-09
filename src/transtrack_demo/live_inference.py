@@ -10,8 +10,9 @@ os.environ.setdefault("TF_ENABLE_ONEDNN_OPTS", "0")
 
 import cv2
 
-from .camera import choose_camera
-from .logger import CsvLogger
+from . import ui
+from .camera import camera_name, choose_camera
+from .inference_worker import InferenceWorker
 
 BACKENDS = {
     "dshow": cv2.CAP_DSHOW,
@@ -44,25 +45,16 @@ def draw_status(frame, result, pending_frames, needed_frames):
     cv2.putText(frame, label, (24, 46), cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
 
 
-def save_clip(path, frames, fps, size):
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    writer = cv2.VideoWriter(str(path), fourcc, fps, size)
-    for frame in frames:
-        writer.write(frame)
-    writer.release()
-
-
 def main():
     args = parse_args()
     camera_index = args.camera if args.camera is not None else choose_camera()
+    selected_camera_name = camera_name(camera_index)
     model_path = Path(args.model)
     runtime_dir = Path(args.runtime_dir)
     runtime_dir.mkdir(parents=True, exist_ok=True)
 
     if not model_path.exists():
         raise FileNotFoundError(f"Model not found: {model_path}")
-
-    from .pipeline import predict
 
     capture = cv2.VideoCapture(camera_index, BACKENDS[args.backend])
     if not capture.isOpened():
@@ -75,14 +67,18 @@ def main():
     infer_interval = max(1, fps * args.infer_every)
 
     frames = deque(maxlen=needed_frames)
-    logger = CsvLogger(args.log)
-    latest_result = None
     frame_index = 0
+    worker = InferenceWorker(
+        model_path=model_path,
+        runtime_dir=runtime_dir,
+        log_path=args.log,
+        fps=fps,
+        size=(width, height),
+        on_result=ui.inference_line,
+    )
+    worker.start()
 
-    print("\nRunning. Press q in the camera window to stop.")
-    print(f"Camera index : {camera_index}")
-    print(f"Backend      : {args.backend}")
-    print(f"Log file     : {args.log}\n")
+    ui.run_info(camera_index, selected_camera_name, args.backend, args.log)
     try:
         while True:
             ok, frame = capture.read()
@@ -95,20 +91,14 @@ def main():
             ready = len(frames) == needed_frames
             due = frame_index % infer_interval == 0
             if ready and due:
-                clip_path = runtime_dir / "latest_camera_clip.mp4"
-                save_clip(clip_path, list(frames), fps, (width, height))
-                latest_result = predict(clip_path, model_path)
-                logger.write(latest_result)
-                print(
-                    f"label={latest_result['label']} "
-                    f"confidence={latest_result['confidence']:.4f}"
-                )
+                worker.submit(frames)
 
-            draw_status(frame, latest_result, len(frames), needed_frames)
+            draw_status(frame, worker.latest_result, len(frames), needed_frames)
             cv2.imshow("TransTrack Live Fatigue Detection", frame)
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
     finally:
+        worker.stop()
         capture.release()
         cv2.destroyAllWindows()
 

@@ -9,10 +9,11 @@ Simple live fatigue-detection CLI using a PC-connected camera.
 conda activate transtrack_demo
 ```
 
-This also copies the required model files from:
+To copy model files during setup, set the source repo first:
 
-```text
-C:\Users\lulay\Desktop\Activities\transtrack\transtrack-api\models
+```powershell
+$env:TRANSTRACK_API_ROOT="path\to\transtrack-api"
+.\setup_env.ps1
 ```
 
 Alternative:

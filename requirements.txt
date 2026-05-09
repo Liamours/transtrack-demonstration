@@ -3,3 +3,5 @@ mediapipe>=0.10
 numpy>=1.24
 torch>=2.3
 protobuf<5
+colorama>=0.4
+pygrabber>=0.2

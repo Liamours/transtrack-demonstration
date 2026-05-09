@@ -3,13 +3,10 @@ import sys
 
 
 def _remove_user_site_packages():
-    paths = {site.getusersitepackages()}
-    paths.update(site.getsitepackages() if hasattr(site, "getsitepackages") else [])
-    user_roaming = "\\AppData\\Roaming\\Python\\"
-
+    user_site = site.getusersitepackages().lower()
     sys.path[:] = [
         path for path in sys.path
-        if user_roaming.lower() not in path.lower()
+        if path.lower() != user_site
     ]
 
 
