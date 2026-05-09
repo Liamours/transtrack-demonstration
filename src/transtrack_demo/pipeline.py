@@ -332,8 +332,14 @@ def predict(video_path: str | Path, model_path: str | Path,
         probs     = F.softmax(model(tensor), dim=-1)
         conf, cls = torch.max(probs, dim=-1)
 
+    scores = {
+        name: round(probs[0, index].item(), 4)
+        for index, name in enumerate(CLASS_NAMES)
+    }
+
     return {
         "label":      CLASS_NAMES[cls.item()],
         "class_id":   cls.item(),
         "confidence": round(conf.item(), 4),
+        "scores":     scores,
     }
