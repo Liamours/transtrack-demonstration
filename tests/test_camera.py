@@ -1,32 +1,32 @@
-from unittest.mock import MagicMock
-
 from src.transtrack_demo import camera
 
 
-def test_list_cameras_returns_open_indices(monkeypatch):
-    captures = []
+def test_list_camera_names_returns_powershell_lines(monkeypatch):
+    class Result:
+        returncode = 0
+        stdout = "Integrated Camera\nNVIDIA Broadcast\n"
 
-    def fake_capture(index):
-        capture = MagicMock()
-        capture.isOpened.return_value = index in {0, 2}
-        captures.append(capture)
-        return capture
+    monkeypatch.setattr(camera.platform, "system", lambda: "Windows")
+    monkeypatch.setattr(camera.subprocess, "run", lambda *args, **kwargs: Result())
 
-    monkeypatch.setattr(camera.cv2, "VideoCapture", fake_capture)
+    assert camera.list_camera_names() == ["Integrated Camera", "NVIDIA Broadcast"]
 
-    assert camera.list_cameras(limit=3) == [0, 2]
-    assert all(capture.release.called for capture in captures)
+
+def test_list_camera_names_returns_empty_outside_windows(monkeypatch):
+    monkeypatch.setattr(camera.platform, "system", lambda: "Linux")
+
+    assert camera.list_camera_names() == []
 
 
 def test_choose_camera_defaults_to_zero(monkeypatch):
-    monkeypatch.setattr(camera, "list_cameras", lambda limit=5: [0, 1])
+    monkeypatch.setattr(camera, "list_camera_names", lambda: ["Camera A", "Camera B"])
     monkeypatch.setattr("builtins.input", lambda prompt: "")
 
     assert camera.choose_camera() == 0
 
 
 def test_choose_camera_uses_user_input(monkeypatch):
-    monkeypatch.setattr(camera, "list_cameras", lambda limit=5: [0, 1])
+    monkeypatch.setattr(camera, "list_camera_names", lambda: ["Camera A", "Camera B"])
     monkeypatch.setattr("builtins.input", lambda prompt: "1")
 
     assert camera.choose_camera() == 1

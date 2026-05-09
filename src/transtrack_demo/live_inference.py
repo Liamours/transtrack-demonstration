@@ -1,16 +1,29 @@
 import argparse
+import os
 from collections import deque
 from pathlib import Path
+
+os.environ.setdefault("GLOG_minloglevel", "2")
+os.environ.setdefault("GRPC_VERBOSITY", "ERROR")
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
+os.environ.setdefault("TF_ENABLE_ONEDNN_OPTS", "0")
 
 import cv2
 
 from .camera import choose_camera
 from .logger import CsvLogger
 
+BACKENDS = {
+    "dshow": cv2.CAP_DSHOW,
+    "msmf": cv2.CAP_MSMF,
+    "any": cv2.CAP_ANY,
+}
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="TransTrack live fatigue demo")
     parser.add_argument("--camera", type=int, default=None)
+    parser.add_argument("--backend", choices=BACKENDS, default="dshow")
     parser.add_argument("--model", default="models/classifier/best_val_f1.pth")
     parser.add_argument("--clip-seconds", type=int, default=20)
     parser.add_argument("--infer-every", type=int, default=10)
@@ -51,7 +64,7 @@ def main():
 
     from .pipeline import predict
 
-    capture = cv2.VideoCapture(camera_index)
+    capture = cv2.VideoCapture(camera_index, BACKENDS[args.backend])
     if not capture.isOpened():
         raise RuntimeError(f"Camera {camera_index} could not be opened.")
 
@@ -66,7 +79,10 @@ def main():
     latest_result = None
     frame_index = 0
 
-    print("Running live inference. Press q to stop.")
+    print("\nRunning. Press q in the camera window to stop.")
+    print(f"Camera index : {camera_index}")
+    print(f"Backend      : {args.backend}")
+    print(f"Log file     : {args.log}\n")
     try:
         while True:
             ok, frame = capture.read()
@@ -84,7 +100,7 @@ def main():
                 latest_result = predict(clip_path, model_path)
                 logger.write(latest_result)
                 print(
-                    f"{latest_result['label']} "
+                    f"label={latest_result['label']} "
                     f"confidence={latest_result['confidence']:.4f}"
                 )
 

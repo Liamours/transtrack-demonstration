@@ -1,22 +1,41 @@
-import cv2
+import platform
+import subprocess
 
 
-def list_cameras(limit=5):
-    cameras = []
-    for index in range(limit):
-        capture = cv2.VideoCapture(index)
-        if capture.isOpened():
-            cameras.append(index)
-        capture.release()
-    return cameras
+def list_camera_names():
+    if platform.system() != "Windows":
+        return []
+
+    command = [
+        "powershell",
+        "-NoProfile",
+        "-Command",
+        (
+            "Get-CimInstance Win32_PnPEntity | "
+            "Where-Object { $_.PNPClass -in @('Camera','Image') } | "
+            "Select-Object -ExpandProperty Name"
+        ),
+    ]
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, timeout=5)
+    except Exception:
+        return []
+    if result.returncode != 0:
+        return []
+    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
 
 
-def choose_camera(limit=5):
-    cameras = list_cameras(limit)
-    if cameras:
-        print(f"Available cameras: {', '.join(str(c) for c in cameras)}")
+def choose_camera():
+    names = list_camera_names()
+
+    print("\nTransTrack Live Fatigue Detection")
+    print("---------------------------------")
+    if names:
+        print("Detected cameras:")
+        for index, name in enumerate(names):
+            print(f"  [{index}] {name}")
     else:
-        print("No camera detected by quick scan. You can still try index 0.")
+        print("No camera names detected. Try index 0 first.")
 
-    raw = input("Choose camera index [0]: ").strip()
+    raw = input("\nCamera index [0]: ").strip()
     return int(raw) if raw else 0

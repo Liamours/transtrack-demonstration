@@ -16,6 +16,18 @@ python run_demo.py
 
 Choose the camera index when prompted. Press `q` to stop.
 
+To skip the prompt:
+
+```powershell
+python run_demo.py --camera 0
+```
+
+If a camera fails to open, try:
+
+```powershell
+python run_demo.py --camera 0 --backend msmf
+```
+
 The app:
 - captures camera frames continuously
 - runs the TransTrack MediaPipe + MultiScaleTCN pipeline

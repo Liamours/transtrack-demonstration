@@ -37,7 +37,7 @@ def test_main_runs_inference_and_logs_without_real_camera(monkeypatch, tmp_path)
     }.get(prop, 0)
     capture.read.side_effect = [(True, frame) for frame in frames] + [(False, None)]
 
-    monkeypatch.setattr(live_inference.cv2, "VideoCapture", lambda index: capture)
+    monkeypatch.setattr(live_inference.cv2, "VideoCapture", lambda index, backend: capture)
     monkeypatch.setattr(live_inference.cv2, "imshow", lambda *args: None)
     monkeypatch.setattr(live_inference.cv2, "waitKey", lambda delay: -1)
     monkeypatch.setattr(live_inference.cv2, "destroyAllWindows", lambda: None)
@@ -56,6 +56,7 @@ def test_main_runs_inference_and_logs_without_real_camera(monkeypatch, tmp_path)
         "parse_args",
         lambda: SimpleNamespace(
             camera=0,
+            backend="dshow",
             model=str(model_path),
             clip_seconds=2,
             infer_every=2,
