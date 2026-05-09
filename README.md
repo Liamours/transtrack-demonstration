@@ -27,3 +27,10 @@ Default model path:
 ```text
 models/classifier/best_val_f1.pth
 ```
+
+## Test
+
+```powershell
+pip install -r requirements-dev.txt
+python -m pytest -q
+```
