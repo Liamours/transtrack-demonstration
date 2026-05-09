@@ -5,7 +5,15 @@ Simple live fatigue-detection CLI using a PC-connected camera.
 ## Setup
 
 ```powershell
-pip install -r requirements.txt
+.\setup_env.ps1
+conda activate transtrack_demo
+```
+
+Alternative:
+
+```powershell
+conda env create -f environment.yml
+conda activate transtrack_demo
 ```
 
 ## Run
