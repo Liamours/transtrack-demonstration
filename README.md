@@ -1,6 +1,6 @@
 # TransTrack Demonstration
 
-Live fatigue-detection demonstration using a PC-connected camera.
+Simple live fatigue-detection CLI using a PC-connected camera.
 
 ## Setup
 
@@ -11,7 +11,19 @@ pip install -r requirements.txt
 ## Run
 
 ```powershell
-python demo_codes/app.py
+python run_demo.py
 ```
 
-Press `q` to stop. Results are displayed live and saved to `fatigue_log.csv`.
+Choose the camera index when prompted. Press `q` to stop.
+
+The app:
+- captures camera frames continuously
+- runs the TransTrack MediaPipe + MultiScaleTCN pipeline
+- displays the current label
+- writes CSV logs to `logs/fatigue_inference.csv`
+
+Default model path:
+
+```text
+models/classifier/best_val_f1.pth
+```

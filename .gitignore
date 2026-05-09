@@ -1,5 +1,12 @@
 __pycache__/
+**/__pycache__/
 *.py[cod]
 .venv/
 venv/
 .env
+logs/
+runtime/
+models/**/*.pth
+models/**/*.pt
+models/**/*.onnx
+models/**/*.task
