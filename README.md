@@ -9,6 +9,12 @@ Simple live fatigue-detection CLI using a PC-connected camera.
 conda activate transtrack_demo
 ```
 
+This also copies the required model files from:
+
+```text
+C:\Users\lulay\Desktop\Activities\transtrack\transtrack-api\models
+```
+
 Alternative:
 
 ```powershell
@@ -17,6 +23,12 @@ conda activate transtrack_demo
 ```
 
 ## Run
+
+Use the new env, not another existing env:
+
+```powershell
+conda activate transtrack_demo
+```
 
 ```powershell
 python run_demo.py
