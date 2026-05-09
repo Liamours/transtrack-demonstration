@@ -50,11 +50,15 @@ def run_info(camera_index, camera_name, backend, log_path):
 
 def inference_line(result):
     scores = result.get("scores", {})
+    warning = result["label"] in {"eyes_closed", "yawning"}
+    status = "WARNING" if warning else "OK"
+    status_color = YELLOW if warning else GREEN
     score_text = " ".join(
         f"{WHITE}{name}{RESET}:{YELLOW}{score:.4f}{RESET}"
         for name, score in scores.items()
     )
     print(
+        f"{status_color}{BRIGHT}{status}{RESET} "
         f"{GREEN}label={RESET}{WHITE}{result['label']}{RESET} "
         f"{GREEN}confidence={RESET}{YELLOW}{result['confidence']:.4f}{RESET} "
         f"{score_text}"

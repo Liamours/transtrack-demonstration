@@ -38,8 +38,10 @@ def draw_status(frame, result, pending_frames, needed_frames):
         label = f"Collecting frames {pending_frames}/{needed_frames}"
         color = (255, 255, 255)
     else:
-        label = f"{result['label']} ({result['confidence']:.2f})"
-        color = (0, 0, 255) if result["label"] != "normal" else (0, 180, 0)
+        warning = result["label"] in {"eyes_closed", "yawning"}
+        prefix = "WARNING " if warning else ""
+        label = f"{prefix}{result['label']} ({result['confidence']:.2f})"
+        color = (0, 220, 255) if warning else (0, 180, 0)
 
     cv2.rectangle(frame, (10, 10), (520, 62), (0, 0, 0), -1)
     cv2.putText(frame, label, (24, 46), cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
