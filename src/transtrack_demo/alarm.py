@@ -18,6 +18,7 @@ def alarm_wav_bytes(duration=0.35, frequency=880, rate=44100):
     return buffer.getvalue()
 
 
-def autoplay_audio_html(audio_bytes):
+def autoplay_audio_html(audio_bytes, key=None):
     data = base64.b64encode(audio_bytes).decode("ascii")
-    return f'<audio autoplay><source src="data:audio/wav;base64,{data}" type="audio/wav"></audio>'
+    marker = f' data-key="{key}"' if key is not None else ""
+    return f'<audio autoplay{marker}><source src="data:audio/wav;base64,{data}" type="audio/wav"></audio>'

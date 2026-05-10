@@ -19,8 +19,9 @@ def test_fatigue_stats_tracks_warning_rate():
 
 def test_alarm_audio_html_contains_wav_data():
     audio = alarm_wav_bytes(duration=0.01)
-    html = autoplay_audio_html(audio)
+    html = autoplay_audio_html(audio, key=1)
 
     assert audio.startswith(b"RIFF")
     assert "audio/wav" in html
     assert "base64" in html
+    assert 'data-key="1"' in html

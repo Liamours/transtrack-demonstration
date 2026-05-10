@@ -15,7 +15,8 @@ def test_streamlit_defaults_are_fixed():
     assert 'st.sidebar.number_input("Infer every seconds"' not in source
     assert 'st.sidebar.text_input("CSV log"' not in source
     assert "st.bar_chart" not in source
-    assert "Show model input box" in source
+    assert "Show model input box" not in source
+    assert "_draw_model_input_box" not in source
 
 
 def test_streamlit_uses_single_start_stop_button():

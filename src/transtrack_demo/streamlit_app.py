@@ -80,12 +80,6 @@ def _new_log_path():
     return str(Path(DEFAULT_LOG_DIR) / f"{timestamp}_streamlit_inference.csv")
 
 
-def _draw_model_input_box(frame):
-    height, width = frame.shape[:2]
-    cv2.rectangle(frame, (0, 0), (width - 1, height - 1), (0, 220, 255), 4)
-    return frame
-
-
 def _run_stream(
     camera_index,
     backend,
@@ -94,7 +88,6 @@ def _run_stream(
     infer_every,
     log_path,
     alarm_enabled,
-    show_input_box,
 ):
     capture = cv2.VideoCapture(camera_index, BACKENDS[backend])
     if not capture.isOpened():
@@ -125,6 +118,8 @@ def _run_stream(
     worker.start()
     last_seen_result = None
     frame_index = 0
+    missed_reads = 0
+    alarm_index = 0
 
     with details_box.container():
         _video_details(fps, width, height, clip_seconds, infer_every, needed_frames)
@@ -133,8 +128,13 @@ def _run_stream(
         while st.session_state.get("stream_running", False):
             ok, frame = capture.read()
             if not ok:
-                st.error("Camera frame could not be read.")
-                break
+                missed_reads += 1
+                if missed_reads >= 30:
+                    st.error("Camera frame could not be read.")
+                    break
+                time.sleep(0.05)
+                continue
+            missed_reads = 0
 
             frame_index += 1
             frames.append(frame.copy())
@@ -147,16 +147,14 @@ def _run_stream(
                 stats.update(result)
                 last_seen_result = result
                 if alarm_enabled and result["label"] in WARNING_LABELS:
+                    alarm_index += 1
                     alarm_box.markdown(
-                        autoplay_audio_html(alarm_wav_bytes()),
+                        autoplay_audio_html(alarm_wav_bytes(), key=alarm_index),
                         unsafe_allow_html=True,
                     )
 
-            display_frame = frame.copy()
-            if show_input_box:
-                display_frame = _draw_model_input_box(display_frame)
             frame_box.image(
-                cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB),
+                cv2.cvtColor(frame, cv2.COLOR_BGR2RGB),
                 channels="RGB",
                 use_container_width=True,
             )
@@ -183,7 +181,6 @@ def main():
         format_func=lambda index: f"{index} - {cameras[index]}",
     )
     alarm_enabled = st.sidebar.checkbox("Alarm on fatigue", value=True)
-    show_input_box = st.sidebar.checkbox("Show model input box", value=False)
 
     st.sidebar.caption(f"Selected: {camera_name(camera_index)}")
 
@@ -213,7 +210,6 @@ def main():
             DEFAULT_INFER_EVERY,
             st.session_state.stream_log_path,
             alarm_enabled,
-            show_input_box,
         )
     else:
         st.info("Press Start to begin camera inference.")
