@@ -1,6 +1,6 @@
 # TransTrack Demo
 
-Simple camera demo for live fatigue inference.
+Local Streamlit demo for live fatigue inference.
 
 ## Setup
 
@@ -13,17 +13,19 @@ conda activate transtrack_demo
 ## Run
 
 ```powershell
-python run_demo.py
+streamlit run streamlit_app.py
 ```
 
 Optional:
 
 ```powershell
+python run_demo.py
 python run_demo.py --camera 0
 python run_demo.py --camera 0 --backend msmf
 ```
 
-Press `q` to stop. `eyes_closed` and `yawning` are shown as warnings.
+Streamlit shows camera feed, label scores, video details, warning alarm, and fatigue statistics.
+`eyes_closed` and `yawning` are warning labels.
 
 ## Test
 
