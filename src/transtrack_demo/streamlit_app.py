@@ -57,10 +57,6 @@ def _result_panel(result):
     else:
         st.success(f"OK: {result['label']} ({result['confidence']:.4f})")
 
-    scores = result.get("scores", {})
-    if scores:
-        st.bar_chart(scores)
-
 
 def _video_details(fps, width, height, clip_seconds, infer_every, needed_frames):
     st.subheader("Video Specificity")
