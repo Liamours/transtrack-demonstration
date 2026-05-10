@@ -1,6 +1,7 @@
 import os
 import time
 from collections import deque
+from datetime import datetime
 from pathlib import Path
 
 os.environ.setdefault("GLOG_minloglevel", "2")
@@ -14,14 +15,14 @@ import streamlit as st
 from .alarm import alarm_wav_bytes, autoplay_audio_html
 from .camera import camera_name, list_cameras
 from .inference_worker import InferenceWorker
-from .live_inference import BACKENDS, draw_status
+from .live_inference import BACKENDS
 from .stats import FatigueStats, WARNING_LABELS
 
 DEFAULT_BACKEND = "dshow"
 DEFAULT_MODEL_PATH = "models/classifier/best_val_f1.pth"
 DEFAULT_CLIP_SECONDS = 20
 DEFAULT_INFER_EVERY = 10
-DEFAULT_LOG_PATH = "logs/streamlit_inference.csv"
+DEFAULT_LOG_DIR = "logs"
 
 
 def _camera_options():
@@ -74,7 +75,27 @@ def _video_details(fps, width, height, clip_seconds, infer_every, needed_frames)
     )
 
 
-def _run_stream(camera_index, backend, model_path, clip_seconds, infer_every, log_path, alarm_enabled):
+def _new_log_path():
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return str(Path(DEFAULT_LOG_DIR) / f"{timestamp}_streamlit_inference.csv")
+
+
+def _draw_model_input_box(frame):
+    height, width = frame.shape[:2]
+    cv2.rectangle(frame, (0, 0), (width - 1, height - 1), (0, 220, 255), 4)
+    return frame
+
+
+def _run_stream(
+    camera_index,
+    backend,
+    model_path,
+    clip_seconds,
+    infer_every,
+    log_path,
+    alarm_enabled,
+    show_input_box,
+):
     capture = cv2.VideoCapture(camera_index, BACKENDS[backend])
     if not capture.isOpened():
         st.error(f"Camera {camera_index} could not be opened.")
@@ -131,8 +152,14 @@ def _run_stream(camera_index, backend, model_path, clip_seconds, infer_every, lo
                         unsafe_allow_html=True,
                     )
 
-            draw_status(frame, result, len(frames), needed_frames)
-            frame_box.image(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), channels="RGB")
+            display_frame = frame.copy()
+            if show_input_box:
+                display_frame = _draw_model_input_box(display_frame)
+            frame_box.image(
+                cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB),
+                channels="RGB",
+                use_container_width=True,
+            )
 
             with result_box.container():
                 _result_panel(result)
@@ -156,6 +183,7 @@ def main():
         format_func=lambda index: f"{index} - {cameras[index]}",
     )
     alarm_enabled = st.sidebar.checkbox("Alarm on fatigue", value=True)
+    show_input_box = st.sidebar.checkbox("Show model input box", value=False)
 
     st.sidebar.caption(f"Selected: {camera_name(camera_index)}")
 
@@ -163,23 +191,29 @@ def main():
         st.error(f"Model not found: {DEFAULT_MODEL_PATH}")
         return
 
-    start = st.sidebar.button("Start", type="primary")
-    stop = st.sidebar.button("Stop")
-
-    if start:
-        st.session_state.stream_running = True
-    if stop:
+    if "stream_running" not in st.session_state:
         st.session_state.stream_running = False
+    if "stream_log_path" not in st.session_state:
+        st.session_state.stream_log_path = _new_log_path()
+
+    button_label = "Stop" if st.session_state.stream_running else "Start"
+    button_type = "secondary" if st.session_state.stream_running else "primary"
+    if st.sidebar.button(button_label, type=button_type):
+        st.session_state.stream_running = not st.session_state.stream_running
+        if st.session_state.stream_running:
+            st.session_state.stream_log_path = _new_log_path()
 
     if st.session_state.get("stream_running", False):
+        st.sidebar.caption(f"Log: {st.session_state.stream_log_path}")
         _run_stream(
             camera_index,
             DEFAULT_BACKEND,
             DEFAULT_MODEL_PATH,
             DEFAULT_CLIP_SECONDS,
             DEFAULT_INFER_EVERY,
-            DEFAULT_LOG_PATH,
+            st.session_state.stream_log_path,
             alarm_enabled,
+            show_input_box,
         )
     else:
         st.info("Press Start to begin camera inference.")
