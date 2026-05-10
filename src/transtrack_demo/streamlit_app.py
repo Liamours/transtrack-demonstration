@@ -17,6 +17,12 @@ from .inference_worker import InferenceWorker
 from .live_inference import BACKENDS, draw_status
 from .stats import FatigueStats, WARNING_LABELS
 
+DEFAULT_BACKEND = "dshow"
+DEFAULT_MODEL_PATH = "models/classifier/best_val_f1.pth"
+DEFAULT_CLIP_SECONDS = 20
+DEFAULT_INFER_EVERY = 10
+DEFAULT_LOG_PATH = "logs/streamlit_inference.csv"
+
 
 def _camera_options():
     cameras = list_cameras()
@@ -153,17 +159,12 @@ def main():
         options=list(cameras.keys()),
         format_func=lambda index: f"{index} - {cameras[index]}",
     )
-    backend = st.sidebar.selectbox("Backend", options=list(BACKENDS.keys()))
-    model_path = st.sidebar.text_input("Model", "models/classifier/best_val_f1.pth")
-    clip_seconds = st.sidebar.number_input("Clip seconds", min_value=5, max_value=60, value=20)
-    infer_every = st.sidebar.number_input("Infer every seconds", min_value=1, max_value=60, value=10)
-    log_path = st.sidebar.text_input("CSV log", "logs/streamlit_inference.csv")
     alarm_enabled = st.sidebar.checkbox("Alarm on fatigue", value=True)
 
     st.sidebar.caption(f"Selected: {camera_name(camera_index)}")
 
-    if not Path(model_path).exists():
-        st.error(f"Model not found: {model_path}")
+    if not Path(DEFAULT_MODEL_PATH).exists():
+        st.error(f"Model not found: {DEFAULT_MODEL_PATH}")
         return
 
     start = st.sidebar.button("Start", type="primary")
@@ -175,7 +176,15 @@ def main():
         st.session_state.stream_running = False
 
     if st.session_state.get("stream_running", False):
-        _run_stream(camera_index, backend, model_path, int(clip_seconds), int(infer_every), log_path, alarm_enabled)
+        _run_stream(
+            camera_index,
+            DEFAULT_BACKEND,
+            DEFAULT_MODEL_PATH,
+            DEFAULT_CLIP_SECONDS,
+            DEFAULT_INFER_EVERY,
+            DEFAULT_LOG_PATH,
+            alarm_enabled,
+        )
     else:
         st.info("Press Start to begin camera inference.")
 
