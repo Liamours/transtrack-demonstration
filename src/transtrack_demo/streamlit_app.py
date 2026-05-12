@@ -17,7 +17,7 @@ from .camera import camera_name, list_cameras
 from .inference_worker import InferenceWorker
 from .live_inference import BACKENDS
 from .stats import FatigueStats, WARNING_LABELS
-from .visual_features import VisualFeatureExtractor, draw_ear_mar, draw_landmarks, draw_stats
+from .visual_features import VisualFeatureExtractor, draw_ear_mar, draw_landmarks, draw_stats, zoom_landmark_region
 
 DEFAULT_BACKEND = "dshow"
 DEFAULT_MODEL_PATH = "models/classifier/best_val_f1.pth"
@@ -90,7 +90,9 @@ def _run_stream(
 
     frames = deque(maxlen=needed_frames)
     stats = FatigueStats()
-    frame_box = st.empty()
+    frame_col, zoom_col = st.columns([2, 1])
+    frame_box = frame_col.empty()
+    zoom_box = zoom_col.empty()
     result_box = st.empty()
     alarm_box = st.empty()
     details_box = st.empty()
@@ -153,9 +155,16 @@ def _run_stream(
                 if show_ear_mar:
                     draw_ear_mar(display_frame, features)
             draw_stats(display_frame, stats)
+            zoom_frame = zoom_landmark_region(display_frame, features["landmarks"] if features else [])
 
             frame_box.image(
                 cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB),
+                channels="RGB",
+                use_container_width=True,
+            )
+            zoom_box.image(
+                cv2.cvtColor(zoom_frame, cv2.COLOR_BGR2RGB),
+                caption="Zoomed landmark view",
                 channels="RGB",
                 use_container_width=True,
             )

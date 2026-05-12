@@ -96,3 +96,30 @@ def draw_stats(frame, stats):
         y = y1 + 30 + index * 27
         cv2.putText(frame, line, (x1 + 14, y), cv2.FONT_HERSHEY_DUPLEX, 0.62, (255, 255, 255), 1)
     return frame
+
+
+def zoom_landmark_region(frame, landmarks, scale=2.5, padding=80):
+    height, width = frame.shape[:2]
+    if not landmarks:
+        crop_width = max(1, width // 2)
+        crop_height = max(1, height // 2)
+        x1 = (width - crop_width) // 2
+        y1 = (height - crop_height) // 2
+        crop = frame[y1:y1 + crop_height, x1:x1 + crop_width]
+    else:
+        points = np.array(
+            [[int(landmark.x * width), int(landmark.y * height)] for landmark in landmarks],
+            dtype=np.int32,
+        )
+        x1 = max(0, int(points[:, 0].min()) - padding)
+        y1 = max(0, int(points[:, 1].min()) - padding)
+        x2 = min(width, int(points[:, 0].max()) + padding)
+        y2 = min(height, int(points[:, 1].max()) + padding)
+        crop = frame[y1:y2, x1:x2]
+
+    if crop.size == 0:
+        return frame.copy()
+
+    zoom_width = max(1, int(crop.shape[1] * scale))
+    zoom_height = max(1, int(crop.shape[0] * scale))
+    return cv2.resize(crop, (zoom_width, zoom_height), interpolation=cv2.INTER_LINEAR)

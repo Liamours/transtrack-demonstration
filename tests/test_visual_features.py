@@ -3,7 +3,13 @@ from types import SimpleNamespace
 import numpy as np
 
 from src.transtrack_demo.stats import FatigueStats
-from src.transtrack_demo.visual_features import EYE_MOUTH_INDICES, draw_ear_mar, draw_landmarks, draw_stats
+from src.transtrack_demo.visual_features import (
+    EYE_MOUTH_INDICES,
+    draw_ear_mar,
+    draw_landmarks,
+    draw_stats,
+    zoom_landmark_region,
+)
 
 
 def test_draw_landmarks_changes_frame_pixels():
@@ -42,3 +48,15 @@ def test_draw_stats_changes_frame_pixels():
     draw_stats(frame, stats)
 
     assert frame.sum() > 0
+
+
+def test_zoom_landmark_region_returns_zoomed_crop():
+    frame = np.zeros((100, 100, 3), dtype=np.uint8)
+    landmarks = [SimpleNamespace(x=0.45, y=0.45), SimpleNamespace(x=0.55, y=0.55)]
+
+    zoom = zoom_landmark_region(frame, landmarks, scale=2.0, padding=10)
+
+    assert zoom.shape[0] > 0
+    assert zoom.shape[1] > 0
+    assert zoom.shape[0] <= frame.shape[0] * 2
+    assert zoom.shape[1] <= frame.shape[1] * 2

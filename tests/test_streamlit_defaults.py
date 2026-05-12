@@ -23,6 +23,7 @@ def test_streamlit_defaults_are_fixed():
     assert "_feature_panel" not in source
     assert "draw_ear_mar" in source
     assert "draw_stats" in source
+    assert "zoom_landmark_region" in source
     assert "st.metric" not in source
     assert "st.progress" not in source
     assert "st.bar_chart" not in source
