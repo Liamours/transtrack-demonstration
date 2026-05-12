@@ -17,7 +17,7 @@ from .camera import camera_name, list_cameras
 from .inference_worker import InferenceWorker
 from .live_inference import BACKENDS
 from .stats import FatigueStats, WARNING_LABELS
-from .visual_features import VisualFeatureExtractor, draw_ear_mar, draw_landmarks
+from .visual_features import VisualFeatureExtractor, draw_ear_mar, draw_landmarks, draw_stats
 
 DEFAULT_BACKEND = "dshow"
 DEFAULT_MODEL_PATH = "models/classifier/best_val_f1.pth"
@@ -31,24 +31,6 @@ def _camera_options():
     if not cameras:
         return {0: "Camera 0"}
     return {camera["index"]: camera["name"] for camera in cameras}
-
-
-def _stats_cards(stats, show_distribution):
-    data = stats.as_dict()
-    cols = st.columns(4)
-    cols[0].metric("Inferences", data["total"])
-    cols[1].metric("Warnings", data["warning"])
-    cols[2].metric("Fatigue Rate", f"{data['fatigue_rate'] * 100:.1f}%")
-    cols[3].metric("Normal", data["counts"].get("normal", 0))
-
-    st.progress(min(data["fatigue_rate"], 1.0))
-    st.caption(
-        f"eyes_closed: {data['counts'].get('eyes_closed', 0)} | "
-        f"yawning: {data['counts'].get('yawning', 0)}"
-    )
-    if show_distribution:
-        st.subheader("Label Distribution")
-        st.bar_chart(data["counts"])
 
 
 def _result_panel(result):
@@ -94,7 +76,6 @@ def _run_stream(
     alarm_enabled,
     show_landmarks,
     show_ear_mar,
-    show_distribution,
 ):
     capture = cv2.VideoCapture(camera_index, BACKENDS[backend])
     if not capture.isOpened():
@@ -111,7 +92,6 @@ def _run_stream(
     stats = FatigueStats()
     frame_box = st.empty()
     result_box = st.empty()
-    stats_box = st.empty()
     alarm_box = st.empty()
     details_box = st.empty()
     feature_extractor = None
@@ -172,6 +152,7 @@ def _run_stream(
                     draw_landmarks(display_frame, features["landmarks"])
                 if show_ear_mar:
                     draw_ear_mar(display_frame, features)
+            draw_stats(display_frame, stats)
 
             frame_box.image(
                 cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB),
@@ -181,8 +162,6 @@ def _run_stream(
 
             with result_box.container():
                 _result_panel(result)
-            with stats_box.container():
-                _stats_cards(stats, show_distribution)
 
             time.sleep(0.01)
     finally:
@@ -205,7 +184,6 @@ def main():
     alarm_enabled = st.sidebar.checkbox("Alarm on fatigue", value=True)
     show_landmarks = st.sidebar.checkbox("Show landmarks", value=False)
     show_ear_mar = st.sidebar.checkbox("Show EAR/MAR", value=False)
-    show_distribution = st.sidebar.checkbox("Show label distribution", value=False)
 
     st.sidebar.caption(f"Selected: {camera_name(camera_index)}")
 
@@ -237,7 +215,6 @@ def main():
             alarm_enabled,
             show_landmarks,
             show_ear_mar,
-            show_distribution,
         )
     else:
         st.info("Press Start to begin camera inference.")

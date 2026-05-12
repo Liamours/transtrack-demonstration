@@ -2,7 +2,8 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from src.transtrack_demo.visual_features import EYE_MOUTH_INDICES, draw_ear_mar, draw_landmarks
+from src.transtrack_demo.stats import FatigueStats
+from src.transtrack_demo.visual_features import EYE_MOUTH_INDICES, draw_ear_mar, draw_landmarks, draw_stats
 
 
 def test_draw_landmarks_changes_frame_pixels():
@@ -30,3 +31,14 @@ def test_draw_ear_mar_changes_frame_pixels():
 
     assert frame.sum() > 0
     assert frame[15, 15].sum() < 765
+
+
+def test_draw_stats_changes_frame_pixels():
+    frame = np.zeros((140, 320, 3), dtype=np.uint8)
+    stats = FatigueStats()
+    stats.update({"label": "normal"})
+    stats.update({"label": "yawning"})
+
+    draw_stats(frame, stats)
+
+    assert frame.sum() > 0

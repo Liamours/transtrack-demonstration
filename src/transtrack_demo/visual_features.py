@@ -70,3 +70,29 @@ def draw_ear_mar(frame, features):
     cv2.putText(frame, ear_text, (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2)
     cv2.putText(frame, mar_text, (20, 62), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2)
     return frame
+
+
+def draw_stats(frame, stats):
+    data = stats.as_dict()
+    lines = [
+        f"Inferences: {data['total']}",
+        f"Warnings: {data['warning']}",
+        f"Fatigue Rate: {data['fatigue_rate'] * 100:.1f}%",
+        f"Normal: {data['counts'].get('normal', 0)}",
+    ]
+    height, width = frame.shape[:2]
+    box_width = 250
+    box_height = 132
+    x1 = max(10, width - box_width - 10)
+    y1 = 10
+    x2 = width - 10
+    y2 = y1 + box_height
+
+    overlay = frame.copy()
+    cv2.rectangle(overlay, (x1, y1), (x2, y2), (0, 0, 0), -1)
+    cv2.addWeighted(overlay, 0.55, frame, 0.45, 0, frame)
+
+    for index, line in enumerate(lines):
+        y = y1 + 30 + index * 27
+        cv2.putText(frame, line, (x1 + 14, y), cv2.FONT_HERSHEY_DUPLEX, 0.62, (255, 255, 255), 1)
+    return frame
