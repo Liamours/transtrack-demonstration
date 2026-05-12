@@ -5,6 +5,7 @@ import numpy as np
 from src.transtrack_demo.stats import FatigueStats
 from src.transtrack_demo.visual_features import (
     EYE_MOUTH_INDICES,
+    LANDMARK_RADIUS,
     draw_ear_mar,
     draw_landmarks,
     draw_stats,
@@ -22,6 +23,7 @@ def test_draw_landmarks_changes_frame_pixels():
     assert frame[10, 10, 1] > 0
     assert frame[10, 10, 0] == 0
     assert frame[10, 10, 2] == 0
+    assert LANDMARK_RADIUS == 1
 
 
 def test_eye_mouth_indices_only_include_target_points():

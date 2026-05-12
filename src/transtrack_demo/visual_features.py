@@ -1,15 +1,17 @@
 import cv2
 import numpy as np
 
-EYE_MOUTH_INDICES = [33, 159, 158, 133, 153, 144, 263, 386, 385, 362, 380, 373, 13, 14, 61, 291]
+EYE_MOUTH_INDICES = (33, 159, 158, 133, 153, 144, 263, 386, 385, 362, 380, 373, 13, 14, 61, 291)
+LANDMARK_RADIUS = 1
 
 
 class VisualFeatureExtractor:
     def __init__(self):
-        from .pipeline import _ensure_mediapipe_model
+        from .pipeline import _LEFT_EYE, _MOUTH, _RIGHT_EYE, _ear, _ensure_mediapipe_model, _mar
         import mediapipe as mp
         from mediapipe.tasks.python import BaseOptions
         from mediapipe.tasks.python.vision import FaceLandmarker, FaceLandmarkerOptions
+        from mediapipe.tasks.python.vision.core.image import Image as MpImage
 
         model_path = _ensure_mediapipe_model()
         options = FaceLandmarkerOptions(
@@ -21,26 +23,29 @@ class VisualFeatureExtractor:
             min_tracking_confidence=0.3,
         )
         self.mp = mp
+        self.mp_image = MpImage
         self.landmarker = FaceLandmarker.create_from_options(options)
+        self.left_eye = _LEFT_EYE
+        self.right_eye = _RIGHT_EYE
+        self.mouth = _MOUTH
+        self.ear = _ear
+        self.mar = _mar
 
     def close(self):
         self.landmarker.close()
 
     def analyze(self, frame):
-        from .pipeline import _LEFT_EYE, _MOUTH, _RIGHT_EYE, _ear, _mar
-        from mediapipe.tasks.python.vision.core.image import Image as MpImage
-
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        result = self.landmarker.detect(MpImage(image_format=self.mp.ImageFormat.SRGB, data=rgb))
+        result = self.landmarker.detect(self.mp_image(image_format=self.mp.ImageFormat.SRGB, data=rgb))
         if not result.face_landmarks:
             return {"landmarks": [], "ear": None, "mar": None}
 
         landmarks = result.face_landmarks[0]
-        ear_l = _ear(landmarks, _LEFT_EYE)
-        ear_r = _ear(landmarks, _RIGHT_EYE)
+        ear_l = self.ear(landmarks, self.left_eye)
+        ear_r = self.ear(landmarks, self.right_eye)
         ear_values = [value for value in (ear_l, ear_r) if not np.isnan(value)]
         ear = float(np.mean(ear_values)) if ear_values else None
-        mar = _mar(landmarks, _MOUTH)
+        mar = self.mar(landmarks, self.mouth)
 
         return {
             "landmarks": [landmarks[index] for index in EYE_MOUTH_INDICES],
@@ -54,7 +59,7 @@ def draw_landmarks(frame, landmarks):
     for landmark in landmarks:
         x = int(landmark.x * width)
         y = int(landmark.y * height)
-        cv2.circle(frame, (x, y), 2, (0, 255, 0), -1)
+        cv2.circle(frame, (x, y), LANDMARK_RADIUS, (0, 255, 0), -1)
     return frame
 
 
