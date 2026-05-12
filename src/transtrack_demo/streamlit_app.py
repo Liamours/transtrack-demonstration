@@ -17,6 +17,7 @@ from .camera import camera_name, list_cameras
 from .inference_worker import InferenceWorker
 from .live_inference import BACKENDS
 from .stats import FatigueStats, WARNING_LABELS
+from .visual_features import VisualFeatureExtractor, draw_landmarks
 
 DEFAULT_BACKEND = "dshow"
 DEFAULT_MODEL_PATH = "models/classifier/best_val_f1.pth"
@@ -32,7 +33,7 @@ def _camera_options():
     return {camera["index"]: camera["name"] for camera in cameras}
 
 
-def _stats_cards(stats):
+def _stats_cards(stats, show_distribution):
     data = stats.as_dict()
     cols = st.columns(4)
     cols[0].metric("Inferences", data["total"])
@@ -45,6 +46,21 @@ def _stats_cards(stats):
         f"eyes_closed: {data['counts'].get('eyes_closed', 0)} | "
         f"yawning: {data['counts'].get('yawning', 0)}"
     )
+    if show_distribution:
+        st.subheader("Label Distribution")
+        st.bar_chart(data["counts"])
+
+
+def _feature_panel(features):
+    if features is None:
+        st.info("Landmark metrics are waiting for a detected face.")
+        return
+
+    ear = features.get("ear")
+    mar = features.get("mar")
+    cols = st.columns(2)
+    cols[0].metric("EAR", "-" if ear is None else f"{ear:.4f}")
+    cols[1].metric("MAR", "-" if mar is None else f"{mar:.4f}")
 
 
 def _result_panel(result):
@@ -88,6 +104,9 @@ def _run_stream(
     infer_every,
     log_path,
     alarm_enabled,
+    show_landmarks,
+    show_ear_mar,
+    show_distribution,
 ):
     capture = cv2.VideoCapture(camera_index, BACKENDS[backend])
     if not capture.isOpened():
@@ -107,6 +126,8 @@ def _run_stream(
     stats_box = st.empty()
     alarm_box = st.empty()
     details_box = st.empty()
+    feature_box = st.empty()
+    feature_extractor = None
 
     worker = InferenceWorker(
         model_path=model_path,
@@ -125,6 +146,9 @@ def _run_stream(
         _video_details(fps, width, height, clip_seconds, infer_every, needed_frames)
 
     try:
+        if show_landmarks or show_ear_mar:
+            feature_extractor = VisualFeatureExtractor()
+
         while st.session_state.get("stream_running", False):
             ok, frame = capture.read()
             if not ok:
@@ -153,19 +177,31 @@ def _run_stream(
                         unsafe_allow_html=True,
                     )
 
+            display_frame = frame.copy()
+            features = None
+            if feature_extractor is not None:
+                features = feature_extractor.analyze(display_frame)
+                if show_landmarks:
+                    draw_landmarks(display_frame, features["landmarks"])
+
             frame_box.image(
-                cv2.cvtColor(frame, cv2.COLOR_BGR2RGB),
+                cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB),
                 channels="RGB",
                 use_container_width=True,
             )
 
             with result_box.container():
                 _result_panel(result)
+            if show_ear_mar:
+                with feature_box.container():
+                    _feature_panel(features)
             with stats_box.container():
-                _stats_cards(stats)
+                _stats_cards(stats, show_distribution)
 
             time.sleep(0.01)
     finally:
+        if feature_extractor is not None:
+            feature_extractor.close()
         worker.stop()
         capture.release()
 
@@ -181,6 +217,9 @@ def main():
         format_func=lambda index: f"{index} - {cameras[index]}",
     )
     alarm_enabled = st.sidebar.checkbox("Alarm on fatigue", value=True)
+    show_landmarks = st.sidebar.checkbox("Show landmarks", value=False)
+    show_ear_mar = st.sidebar.checkbox("Show EAR/MAR", value=False)
+    show_distribution = st.sidebar.checkbox("Show label distribution", value=False)
 
     st.sidebar.caption(f"Selected: {camera_name(camera_index)}")
 
@@ -210,6 +249,9 @@ def main():
             DEFAULT_INFER_EVERY,
             st.session_state.stream_log_path,
             alarm_enabled,
+            show_landmarks,
+            show_ear_mar,
+            show_distribution,
         )
     else:
         st.info("Press Start to begin camera inference.")
