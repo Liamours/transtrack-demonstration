@@ -1,6 +1,8 @@
 import cv2
 import numpy as np
 
+EYE_MOUTH_INDICES = [33, 159, 158, 133, 153, 144, 263, 386, 385, 362, 380, 373, 13, 14, 61, 291]
+
 
 class VisualFeatureExtractor:
     def __init__(self):
@@ -41,7 +43,7 @@ class VisualFeatureExtractor:
         mar = _mar(landmarks, _MOUTH)
 
         return {
-            "landmarks": landmarks,
+            "landmarks": [landmarks[index] for index in EYE_MOUTH_INDICES],
             "ear": ear,
             "mar": None if np.isnan(mar) else mar,
         }
@@ -53,4 +55,16 @@ def draw_landmarks(frame, landmarks):
         x = int(landmark.x * width)
         y = int(landmark.y * height)
         cv2.circle(frame, (x, y), 1, (0, 255, 255), -1)
+    return frame
+
+
+def draw_ear_mar(frame, features):
+    ear = features.get("ear") if features else None
+    mar = features.get("mar") if features else None
+    ear_text = "EAR: -" if ear is None else f"EAR: {ear:.4f}"
+    mar_text = "MAR: -" if mar is None else f"MAR: {mar:.4f}"
+
+    cv2.rectangle(frame, (10, 10), (190, 72), (0, 0, 0), -1)
+    cv2.putText(frame, ear_text, (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2)
+    cv2.putText(frame, mar_text, (20, 62), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 255), 2)
     return frame

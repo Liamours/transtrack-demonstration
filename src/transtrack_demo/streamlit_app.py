@@ -17,7 +17,7 @@ from .camera import camera_name, list_cameras
 from .inference_worker import InferenceWorker
 from .live_inference import BACKENDS
 from .stats import FatigueStats, WARNING_LABELS
-from .visual_features import VisualFeatureExtractor, draw_landmarks
+from .visual_features import VisualFeatureExtractor, draw_ear_mar, draw_landmarks
 
 DEFAULT_BACKEND = "dshow"
 DEFAULT_MODEL_PATH = "models/classifier/best_val_f1.pth"
@@ -49,18 +49,6 @@ def _stats_cards(stats, show_distribution):
     if show_distribution:
         st.subheader("Label Distribution")
         st.bar_chart(data["counts"])
-
-
-def _feature_panel(features):
-    if features is None:
-        st.info("Landmark metrics are waiting for a detected face.")
-        return
-
-    ear = features.get("ear")
-    mar = features.get("mar")
-    cols = st.columns(2)
-    cols[0].metric("EAR", "-" if ear is None else f"{ear:.4f}")
-    cols[1].metric("MAR", "-" if mar is None else f"{mar:.4f}")
 
 
 def _result_panel(result):
@@ -126,7 +114,6 @@ def _run_stream(
     stats_box = st.empty()
     alarm_box = st.empty()
     details_box = st.empty()
-    feature_box = st.empty()
     feature_extractor = None
 
     worker = InferenceWorker(
@@ -183,6 +170,8 @@ def _run_stream(
                 features = feature_extractor.analyze(display_frame)
                 if show_landmarks:
                     draw_landmarks(display_frame, features["landmarks"])
+                if show_ear_mar:
+                    draw_ear_mar(display_frame, features)
 
             frame_box.image(
                 cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB),
@@ -192,9 +181,6 @@ def _run_stream(
 
             with result_box.container():
                 _result_panel(result)
-            if show_ear_mar:
-                with feature_box.container():
-                    _feature_panel(features)
             with stats_box.container():
                 _stats_cards(stats, show_distribution)
 

@@ -20,6 +20,8 @@ def test_streamlit_defaults_are_fixed():
     assert "Show EAR/MAR" in source
     assert "Show label distribution" in source
     assert "VisualFeatureExtractor" in source
+    assert "_feature_panel" not in source
+    assert "draw_ear_mar" in source
 
 
 def test_streamlit_uses_single_start_stop_button():
