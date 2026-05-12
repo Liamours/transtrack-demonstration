@@ -12,6 +12,9 @@ def test_draw_landmarks_changes_frame_pixels():
     draw_landmarks(frame, landmarks)
 
     assert frame.sum() > 0
+    assert frame[10, 10, 1] > 0
+    assert frame[10, 10, 0] == 0
+    assert frame[10, 10, 2] == 0
 
 
 def test_eye_mouth_indices_only_include_target_points():
@@ -26,3 +29,4 @@ def test_draw_ear_mar_changes_frame_pixels():
     draw_ear_mar(frame, {"ear": 0.2, "mar": 0.5})
 
     assert frame.sum() > 0
+    assert frame[15, 15].sum() < 765

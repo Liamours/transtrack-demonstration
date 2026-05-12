@@ -54,7 +54,7 @@ def draw_landmarks(frame, landmarks):
     for landmark in landmarks:
         x = int(landmark.x * width)
         y = int(landmark.y * height)
-        cv2.circle(frame, (x, y), 1, (0, 255, 255), -1)
+        cv2.circle(frame, (x, y), 2, (0, 255, 0), -1)
     return frame
 
 
@@ -64,7 +64,9 @@ def draw_ear_mar(frame, features):
     ear_text = "EAR: -" if ear is None else f"EAR: {ear:.4f}"
     mar_text = "MAR: -" if mar is None else f"MAR: {mar:.4f}"
 
-    cv2.rectangle(frame, (10, 10), (190, 72), (0, 0, 0), -1)
+    overlay = frame.copy()
+    cv2.rectangle(overlay, (10, 10), (190, 72), (0, 0, 0), -1)
+    cv2.addWeighted(overlay, 0.55, frame, 0.45, 0, frame)
     cv2.putText(frame, ear_text, (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2)
-    cv2.putText(frame, mar_text, (20, 62), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 255), 2)
+    cv2.putText(frame, mar_text, (20, 62), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2)
     return frame
