@@ -3,7 +3,7 @@ opencv-python-headless>=4.9
 mediapipe>=0.10
 numpy>=1.24
 torch==2.12.1+cpu
-protobuf<5
+protobuf>=5.26
 colorama>=0.4
 streamlit>=1.35
 streamlit-webrtc>=0.47
