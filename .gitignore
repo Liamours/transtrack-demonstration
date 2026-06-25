@@ -12,3 +12,4 @@ models/**/*.task
 document/
 scripts/
 *.zip
+environment.yml
