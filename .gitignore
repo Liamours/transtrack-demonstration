@@ -8,7 +8,6 @@ logs/
 runtime/
 models/**/*.pt
 models/**/*.onnx
-models/**/*.task
 document/
 scripts/
 *.zip
