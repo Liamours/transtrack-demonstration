@@ -6,6 +6,7 @@ import torch
 import torch.nn.functional as F
 import cv2
 import streamlit as st
+import streamlit.components.v1 as components
 
 from collections import deque
 from datetime import datetime
@@ -19,7 +20,7 @@ os.environ.setdefault("TF_ENABLE_ONEDNN_OPTS", "0")
 import av
 from streamlit_webrtc import VideoProcessorBase, webrtc_streamer, RTCConfiguration
 
-from .alarm import alarm_wav_bytes, autoplay_audio_html
+from .alarm import alarm_wav_bytes, alarm_js_html
 from .logger import CsvLogger
 from .pipeline import (
     make_landmarker, extract_frame,
@@ -177,7 +178,7 @@ def main():
 
     zoom_box    = zoom_col.empty()
     result_box  = st.empty()
-    alarm_box   = st.empty()
+
     details_box = st.empty()
 
     if not ctx.state.playing:
@@ -219,10 +220,7 @@ def main():
     if proc.alarm_event.is_set() and alarm_enabled:
         proc.alarm_event.clear()
         st.session_state.alarm_idx += 1
-        alarm_box.markdown(
-            autoplay_audio_html(alarm_wav_bytes(), key=st.session_state.alarm_idx),
-            unsafe_allow_html=True,
-        )
+        components.html(alarm_js_html(alarm_wav_bytes()), height=0)
 
     time.sleep(0.2)
     st.rerun()
