@@ -1,4 +1,6 @@
 libgl1
+libgles2
+libegl1
+libegl-mesa0
 libglib2.0-0t64
 libgomp1
-libgles2
