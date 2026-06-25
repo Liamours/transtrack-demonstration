@@ -4,11 +4,10 @@ from pathlib import Path
 def test_streamlit_defaults_are_fixed():
     source = Path("src/transtrack_demo/streamlit_app.py").read_text()
 
-    assert 'DEFAULT_BACKEND = "dshow"' in source
     assert 'DEFAULT_MODEL_PATH = "models/classifier/best_val_f1.pth"' in source
-    assert "DEFAULT_CLIP_SECONDS = 20" in source
-    assert "DEFAULT_INFER_EVERY = 10" in source
     assert 'DEFAULT_LOG_DIR = "logs"' in source
+    assert "INFER_EVERY_S" in source
+    assert "FEATURE_FPS" in source
     assert 'st.sidebar.selectbox("Backend"' not in source
     assert 'st.sidebar.text_input("Model"' not in source
     assert 'st.sidebar.number_input("Clip seconds"' not in source
@@ -19,8 +18,6 @@ def test_streamlit_defaults_are_fixed():
     assert "Show landmarks" in source
     assert "Show EAR/MAR" in source
     assert "Show label distribution" not in source
-    assert "VisualFeatureExtractor" in source
-    assert "_feature_panel" not in source
     assert "draw_ear_mar" in source
     assert "draw_stats" in source
     assert "zoom_landmark_region" in source
@@ -29,17 +26,19 @@ def test_streamlit_defaults_are_fixed():
     assert "st.bar_chart" not in source
 
 
-def test_streamlit_uses_single_start_stop_button():
+def test_streamlit_uses_webrtc():
     source = Path("src/transtrack_demo/streamlit_app.py").read_text()
 
-    assert 'button_label = "Stop" if st.session_state.stream_running else "Start"' in source
-    assert "st.sidebar.button(button_label" in source
+    assert "webrtc_streamer" in source
+    assert "VideoProcessorBase" in source
+    assert "FatigueProcessor" in source
     assert 'st.sidebar.button("Start"' not in source
     assert 'st.sidebar.button("Stop"' not in source
+    assert "cv2.VideoCapture" not in source
 
 
 def test_streamlit_log_path_is_timestamped():
     source = Path("src/transtrack_demo/streamlit_app.py").read_text()
 
     assert 'strftime("%Y%m%d_%H%M%S")' in source
-    assert 'f"{timestamp}_streamlit_inference.csv"' in source
+    assert "_streamlit_inference.csv" in source

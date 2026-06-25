@@ -288,6 +288,39 @@ class MultiScaleTCN(nn.Module):
         return self.fc(self._features(x))
 
 
+def make_landmarker() -> FaceLandmarker:
+    """Create a persistent FaceLandmarker for per-frame (non-video) use."""
+    options = FaceLandmarkerOptions(
+        base_options=BaseOptions(model_asset_path=_ensure_mediapipe_model()),
+        running_mode=mp.tasks.vision.RunningMode.IMAGE,
+        num_faces=1,
+        min_face_detection_confidence=0.3,
+        min_face_presence_confidence=0.3,
+        min_tracking_confidence=0.3,
+    )
+    return FaceLandmarker.create_from_options(options)
+
+
+def extract_frame(frame_bgr: np.ndarray, landmarker: FaceLandmarker):
+    """Extract 8 features + EYE_MOUTH landmarks from one BGR frame.
+
+    Returns (features: list[float], lm_points: list) or (None, None) if no face.
+    """
+    from .visual_features import EYE_MOUTH_INDICES
+    fh, fw = frame_bgr.shape[:2]
+    rgb    = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+    result = landmarker.detect(MpImage(image_format=mp.ImageFormat.SRGB, data=rgb))
+    if not result.face_landmarks:
+        return None, None
+    lm    = result.face_landmarks[0]
+    feats = [
+        _ear(lm, _LEFT_EYE), _ear(lm, _RIGHT_EYE), _mar(lm, _MOUTH),
+        *_head_pose(lm, fw, fh),
+        lm[1].x, lm[1].y,
+    ]
+    return feats, [lm[i] for i in EYE_MOUTH_INDICES]
+
+
 _MODEL_REGISTRY = {
     "MultiScaleTCN": MultiScaleTCN,
 }

@@ -6,7 +6,9 @@ venv/
 .env
 logs/
 runtime/
-models/**/*.pth
 models/**/*.pt
 models/**/*.onnx
 models/**/*.task
+document/
+scripts/
+*.zip
