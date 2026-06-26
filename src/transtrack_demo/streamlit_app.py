@@ -94,7 +94,6 @@ class FatigueProcessor(VideoProcessorBase):
     def __init__(self):
         self._lmk          = make_landmarker()
         self._buf          = deque(maxlen=SEQUENCE_LENGTH)
-        self._mar_hist     = []   # ponytail: matches _is_masked logic used during training
         self._model        = None
         self._last_feat_t  = 0.0
         self._last_infer_t = 0.0
@@ -124,7 +123,7 @@ class FatigueProcessor(VideoProcessorBase):
 
         if now - self._last_feat_t >= 1.0 / FEATURE_FPS:
             self._last_feat_t = now
-            feats, lm_points = extract_frame(img, self._lmk, self._mar_hist)
+            feats, lm_points = extract_frame(img, self._lmk)
             self._buf.append(feats if feats is not None else [np.nan] * 8)
             self._last_lm = lm_points
 
@@ -153,17 +152,9 @@ class FatigueProcessor(VideoProcessorBase):
             draw_landmarks(out, self._last_lm)
         if self.show_ear_mar and self._buf:
             f = list(self._buf)[-1]
-            ear_l, ear_r = f[0], f[1]
+            ear_l, ear_r, mar = f[0], f[1], f[2]
             ear = None if (np.isnan(ear_l) and np.isnan(ear_r)) else float(np.nanmean([ear_l, ear_r]))
-            # Raw MAR direct from current landmarks — masking only applies to model input
-            mar_display = None
-            if self._last_lm and len(self._last_lm) >= 16:
-                m = self._last_lm[12:]  # [lm13, lm14, lm61, lm291] mouth points
-                v = ((m[0].x - m[1].x)**2 + (m[0].y - m[1].y)**2)**0.5
-                h = ((m[2].x - m[3].x)**2 + (m[2].y - m[3].y)**2)**0.5
-                if h > 0:
-                    mar_display = float(v / h)
-            draw_ear_mar(out, {"ear": ear, "mar": mar_display})
+            draw_ear_mar(out, {"ear": ear, "mar": None if np.isnan(float(mar)) else float(mar)})
         draw_stats(out, self._stats)
         self.zoom_frame = zoom_landmark_region(out, self._last_lm or [])
 
