@@ -4,7 +4,6 @@ import threading
 import numpy as np
 import torch
 import torch.nn.functional as F
-import cv2
 import streamlit as st
 import streamlit.components.v1 as components
 
@@ -28,7 +27,7 @@ from .pipeline import (
     CLASS_NAMES, SEQUENCE_LENGTH,
 )
 from .stats import FatigueStats, WARNING_LABELS
-from .visual_features import draw_landmarks, draw_ear_mar, draw_stats, zoom_landmark_region
+from .visual_features import draw_landmarks, draw_ear_mar, draw_stats
 
 DEFAULT_MODEL_PATH = "models/classifier/best_val_f1.pth"
 DEFAULT_LOG_DIR    = "logs"
@@ -70,7 +69,6 @@ class FatigueProcessor(VideoProcessorBase):
         self._logger       = None
         self.log_path      = None
         self.result        = None
-        self.zoom_frame    = None
         self.alarm_event   = threading.Event()
 
     def set_log(self, path: str):
@@ -124,7 +122,6 @@ class FatigueProcessor(VideoProcessorBase):
             ear = None if (np.isnan(ear_l) and np.isnan(ear_r)) else float(np.nanmean([ear_l, ear_r]))
             draw_ear_mar(out, {"ear": ear, "mar": None if np.isnan(float(mar)) else float(mar)})
         draw_stats(out, self._stats)
-        self.zoom_frame = zoom_landmark_region(out, self._last_lm or [])
 
         return av.VideoFrame.from_ndarray(out, format="bgr24")
 
@@ -149,18 +146,13 @@ def main():
         p.set_log(_new_log_path())
         return p
 
-    frame_col, zoom_col = st.columns([2, 1])
-    with frame_col:
-        ctx = webrtc_streamer(
-            key="fatigue",
-            video_processor_factory=make_processor,
-            rtc_configuration=_RTC_CONFIG,
-            media_stream_constraints={"video": True, "audio": False},
-        )
+    ctx = webrtc_streamer(
+        key="fatigue",
+        video_processor_factory=make_processor,
+        rtc_configuration=_RTC_CONFIG,
+        media_stream_constraints={"video": True, "audio": False},
+    )
 
-    zoom_slot = zoom_col.empty()
-
-    # Show log path on sidebar interactions (full reruns only)
     if ctx.state.playing:
         p = ctx.video_processor
         if p and p.log_path:
@@ -170,8 +162,6 @@ def main():
         st.info("Press START to begin camera inference.")
         return
 
-    # Anti-flicker: fragment reruns every 0.2s without re-rendering the whole page.
-    # Captures ctx/show_*/alarm_enabled/zoom_slot from main()'s last full run.
     @st.fragment(run_every=0.2)
     def live_panel():
         proc = ctx.video_processor
@@ -180,14 +170,6 @@ def main():
 
         proc.show_landmarks = show_landmarks
         proc.show_ear_mar   = show_ear_mar
-
-        zf = proc.zoom_frame
-        if zf is not None:
-            zoom_slot.image(
-                cv2.cvtColor(zf, cv2.COLOR_BGR2RGB),
-                caption="Zoomed landmark view",
-                use_container_width=True,
-            )
 
         _result_panel(proc.result)
 
