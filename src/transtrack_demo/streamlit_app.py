@@ -39,38 +39,6 @@ _RTC_CONFIG = RTCConfiguration(
     {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
 )
 
-# JS injected into sidebar to enumerate cameras and write ?cam_id= to URL.
-# Full reload on selection is intentional — forces WebRTC to restart with new device.
-_CAMERA_SELECTOR_JS = """
-<style>
-  select{width:100%;padding:3px 6px;font-size:13px;border:1px solid #ccc;border-radius:4px;}
-</style>
-<select id="s" onchange="pick()"><option value="">Default Camera</option></select>
-<script>
-(async()=>{
-  try{
-    try{
-      const s=await navigator.mediaDevices.getUserMedia({video:true,audio:false});
-      s.getTracks().forEach(t=>t.stop());
-    }catch(e){}
-    const cur=new URLSearchParams(window.parent.location.search).get('cam_id')||'';
-    const devs=await navigator.mediaDevices.enumerateDevices();
-    devs.filter(d=>d.kind==='videoinput').forEach((c,i)=>{
-      const o=new Option(c.label||'Camera '+(i+1),c.deviceId);
-      if(c.deviceId===cur)o.selected=true;
-      document.getElementById('s').add(o);
-    });
-  }catch(e){}
-})();
-function pick(){
-  const v=document.getElementById('s').value;
-  const u=new URL(window.parent.location.href);
-  v?u.searchParams.set('cam_id',v):u.searchParams.delete('cam_id');
-  window.parent.location.replace(u.toString());
-}
-</script>
-"""
-
 
 def _new_log_path():
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -165,15 +133,9 @@ def main():
     st.set_page_config(page_title="TransTrack Demo", layout="wide")
     st.title("TransTrack Fatigue Detection")
 
-    cam_id = st.query_params.get("cam_id", "")
-
     alarm_enabled  = st.sidebar.checkbox("Alarm on fatigue", value=True)
     show_landmarks = st.sidebar.checkbox("Show landmarks",   value=False)
     show_ear_mar   = st.sidebar.checkbox("Show EAR/MAR",    value=False)
-
-    with st.sidebar:
-        st.caption("Camera")
-        components.html(_CAMERA_SELECTOR_JS, height=36)
 
     if not Path(DEFAULT_MODEL_PATH).exists():
         st.error(f"Model not found: {DEFAULT_MODEL_PATH}")
@@ -189,12 +151,11 @@ def main():
 
     frame_col, zoom_col = st.columns([2, 1])
     with frame_col:
-        video_constraint = {"deviceId": {"ideal": cam_id}} if cam_id else True
         ctx = webrtc_streamer(
-            key=f"fatigue-{cam_id}",
+            key="fatigue",
             video_processor_factory=make_processor,
             rtc_configuration=_RTC_CONFIG,
-            media_stream_constraints={"video": video_constraint, "audio": False},
+            media_stream_constraints={"video": True, "audio": False},
         )
 
     zoom_slot = zoom_col.empty()
