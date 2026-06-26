@@ -7,8 +7,10 @@ venv/
 logs/
 runtime/
 models/**/*.pt
+models/**/*.pth
 models/**/*.onnx
 document/
 scripts/
 *.zip
+*.tmp*
 environment.yml
