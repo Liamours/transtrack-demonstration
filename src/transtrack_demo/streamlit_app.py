@@ -153,13 +153,16 @@ class FatigueProcessor(VideoProcessorBase):
             draw_landmarks(out, self._last_lm)
         if self.show_ear_mar and self._buf:
             f = list(self._buf)[-1]
-            ear_l, ear_r, mar = f[0], f[1], f[2]
+            ear_l, ear_r = f[0], f[1]
             ear = None if (np.isnan(ear_l) and np.isnan(ear_r)) else float(np.nanmean([ear_l, ear_r]))
-            # Use last raw MAR from history when current frame is masked (stable mouth)
-            if np.isnan(float(mar)) and self._mar_hist:
-                mar_display = float(self._mar_hist[-1])
-            else:
-                mar_display = None if np.isnan(float(mar)) else float(mar)
+            # Raw MAR direct from current landmarks — masking only applies to model input
+            mar_display = None
+            if self._last_lm and len(self._last_lm) >= 16:
+                m = self._last_lm[12:]  # [lm13, lm14, lm61, lm291] mouth points
+                v = ((m[0].x - m[1].x)**2 + (m[0].y - m[1].y)**2)**0.5
+                h = ((m[2].x - m[3].x)**2 + (m[2].y - m[3].y)**2)**0.5
+                if h > 0:
+                    mar_display = float(v / h)
             draw_ear_mar(out, {"ear": ear, "mar": mar_display})
         draw_stats(out, self._stats)
         self.zoom_frame = zoom_landmark_region(out, self._last_lm or [])
