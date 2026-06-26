@@ -39,6 +39,38 @@ _RTC_CONFIG = RTCConfiguration(
     {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
 )
 
+# JS injected into sidebar to enumerate cameras and write ?cam_id= to URL.
+# Full reload on selection is intentional — forces WebRTC to restart with new device.
+_CAMERA_SELECTOR_JS = """
+<style>
+  select{width:100%;padding:3px 6px;font-size:13px;border:1px solid #ccc;border-radius:4px;}
+</style>
+<select id="s" onchange="pick()"><option value="">Default Camera</option></select>
+<script>
+(async()=>{
+  try{
+    try{
+      const s=await navigator.mediaDevices.getUserMedia({video:true,audio:false});
+      s.getTracks().forEach(t=>t.stop());
+    }catch(e){}
+    const cur=new URLSearchParams(window.parent.location.search).get('cam_id')||'';
+    const devs=await navigator.mediaDevices.enumerateDevices();
+    devs.filter(d=>d.kind==='videoinput').forEach((c,i)=>{
+      const o=new Option(c.label||'Camera '+(i+1),c.deviceId);
+      if(c.deviceId===cur)o.selected=true;
+      document.getElementById('s').add(o);
+    });
+  }catch(e){}
+})();
+function pick(){
+  const v=document.getElementById('s').value;
+  const u=new URL(window.parent.location.href);
+  v?u.searchParams.set('cam_id',v):u.searchParams.delete('cam_id');
+  window.parent.location.replace(u.toString());
+}
+</script>
+"""
+
 
 def _new_log_path():
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -56,23 +88,22 @@ def _result_panel(result):
 
 
 class FatigueProcessor(VideoProcessorBase):
-    # Written by main thread, read by recv thread — simple bool, no lock needed
     show_landmarks: bool = False
     show_ear_mar:   bool = False
 
     def __init__(self):
         self._lmk          = make_landmarker()
         self._buf          = deque(maxlen=SEQUENCE_LENGTH)
+        self._mar_hist     = []   # ponytail: matches _is_masked logic used during training
         self._model        = None
         self._last_feat_t  = 0.0
         self._last_infer_t = 0.0
-        self._last_lm      = None   # list of landmark points for drawing
+        self._last_lm      = None
         self._stats        = FatigueStats()
         self._logger       = None
         self.log_path      = None
         self.result        = None
         self.zoom_frame    = None
-        self.video_info    = None
         self.alarm_event   = threading.Event()
 
     def set_log(self, path: str):
@@ -89,29 +120,14 @@ class FatigueProcessor(VideoProcessorBase):
 
     def recv(self, frame: av.VideoFrame) -> av.VideoFrame:
         img = frame.to_ndarray(format="bgr24")
-        fh, fw = img.shape[:2]
         now = time.time()
 
-        if self.video_info is None:
-            self.video_info = {
-                "camera_fps":              f"~{FEATURE_FPS:.0f} (sampled)",
-                "resolution":              f"{fw}x{fh}",
-                "rolling_clip_seconds":    20,
-                "captured_frames_per_clip": SEQUENCE_LENGTH,
-                "inference_interval_seconds": int(INFER_EVERY_S),
-                "model_sampling_fps":      int(FEATURE_FPS),
-                "model_timesteps":         SEQUENCE_LENGTH,
-                "model_window_seconds":    20,
-            }
-
-        # Feature extraction at FEATURE_FPS
         if now - self._last_feat_t >= 1.0 / FEATURE_FPS:
             self._last_feat_t = now
-            feats, lm_points = extract_frame(img, self._lmk)
+            feats, lm_points = extract_frame(img, self._lmk, self._mar_hist)
             self._buf.append(feats if feats is not None else [np.nan] * 8)
             self._last_lm = lm_points
 
-        # Inference every INFER_EVERY_S when buffer full
         if len(self._buf) >= SEQUENCE_LENGTH and now - self._last_infer_t >= INFER_EVERY_S:
             self._last_infer_t = now
             arr = np.nan_to_num(np.array(list(self._buf), dtype=np.float32))
@@ -132,7 +148,6 @@ class FatigueProcessor(VideoProcessorBase):
                 self.alarm_event.set()
             self.result = result
 
-        # Draw overlays
         out = img.copy()
         if self.show_landmarks and self._last_lm:
             draw_landmarks(out, self._last_lm)
@@ -151,9 +166,15 @@ def main():
     st.set_page_config(page_title="TransTrack Demo", layout="wide")
     st.title("TransTrack Fatigue Detection")
 
+    cam_id = st.query_params.get("cam_id", "")
+
     alarm_enabled  = st.sidebar.checkbox("Alarm on fatigue", value=True)
     show_landmarks = st.sidebar.checkbox("Show landmarks",   value=False)
     show_ear_mar   = st.sidebar.checkbox("Show EAR/MAR",    value=False)
+
+    with st.sidebar:
+        st.caption("Camera")
+        components.html(_CAMERA_SELECTOR_JS, height=36)
 
     if not Path(DEFAULT_MODEL_PATH).exists():
         st.error(f"Model not found: {DEFAULT_MODEL_PATH}")
@@ -169,61 +190,56 @@ def main():
 
     frame_col, zoom_col = st.columns([2, 1])
     with frame_col:
+        video_constraint = {"deviceId": {"ideal": cam_id}} if cam_id else True
         ctx = webrtc_streamer(
-            key="fatigue",
+            key=f"fatigue-{cam_id}",
             video_processor_factory=make_processor,
             rtc_configuration=_RTC_CONFIG,
-            media_stream_constraints={"video": True, "audio": False},
+            media_stream_constraints={"video": video_constraint, "audio": False},
         )
 
-    zoom_box    = zoom_col.empty()
-    result_box  = st.empty()
+    zoom_slot = zoom_col.empty()
 
-    details_box = st.empty()
+    # Show log path on sidebar interactions (full reruns only)
+    if ctx.state.playing:
+        p = ctx.video_processor
+        if p and p.log_path:
+            st.sidebar.caption(f"Log: {p.log_path}")
 
     if not ctx.state.playing:
         st.info("Press START to begin camera inference.")
         return
 
-    proc = ctx.video_processor
-    if proc is None:
-        time.sleep(0.1)
-        st.rerun()
+    # Anti-flicker: fragment reruns every 0.2s without re-rendering the whole page.
+    # Captures ctx/show_*/alarm_enabled/zoom_slot from main()'s last full run.
+    @st.fragment(run_every=0.2)
+    def live_panel():
+        proc = ctx.video_processor
+        if proc is None:
+            return
 
-    # Sync sidebar options to processor each run
-    proc.show_landmarks = show_landmarks
-    proc.show_ear_mar   = show_ear_mar
+        proc.show_landmarks = show_landmarks
+        proc.show_ear_mar   = show_ear_mar
 
-    if proc.log_path:
-        st.sidebar.caption(f"Log: {proc.log_path}")
+        zf = proc.zoom_frame
+        if zf is not None:
+            zoom_slot.image(
+                cv2.cvtColor(zf, cv2.COLOR_BGR2RGB),
+                caption="Zoomed landmark view",
+                use_container_width=True,
+            )
 
-    # Zoom view
-    zf = proc.zoom_frame
-    if zf is not None:
-        zoom_box.image(
-            cv2.cvtColor(zf, cv2.COLOR_BGR2RGB),
-            caption="Zoomed landmark view",
-            use_container_width=True,
-        )
-
-    # Video Specificity
-    if proc.video_info:
-        with details_box.container():
-            st.subheader("Video Specificity")
-            st.write(proc.video_info)
-
-    # Result panel
-    with result_box.container():
         _result_panel(proc.result)
 
-    # Alarm
-    if proc.alarm_event.is_set() and alarm_enabled:
-        proc.alarm_event.clear()
-        st.session_state.alarm_idx += 1
-        components.html(alarm_js_html(alarm_wav_bytes()), height=0)
+        if proc.alarm_event.is_set() and alarm_enabled:
+            proc.alarm_event.clear()
+            st.session_state.alarm_idx += 1
+            components.html(
+                alarm_js_html(alarm_wav_bytes(), st.session_state.alarm_idx),
+                height=0,
+            )
 
-    time.sleep(0.2)
-    st.rerun()
+    live_panel()
 
 
 if __name__ == "__main__":

@@ -18,6 +18,6 @@ def alarm_wav_bytes(duration=0.35, frequency=880, rate=44100):
     return buffer.getvalue()
 
 
-def alarm_js_html(audio_bytes):
+def alarm_js_html(audio_bytes, uid=0):
     data = base64.b64encode(audio_bytes).decode("ascii")
-    return f'<script>new Audio("data:audio/wav;base64,{data}").play();</script>'
+    return f'<!--{uid}--><script>new Audio("data:audio/wav;base64,{data}").play();</script>'

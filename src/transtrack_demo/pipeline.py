@@ -301,9 +301,11 @@ def make_landmarker() -> FaceLandmarker:
     return FaceLandmarker.create_from_options(options)
 
 
-def extract_frame(frame_bgr: np.ndarray, landmarker: FaceLandmarker):
+def extract_frame(frame_bgr: np.ndarray, landmarker: FaceLandmarker, mar_hist: list | None = None):
     """Extract 8 features + EYE_MOUTH landmarks from one BGR frame.
 
+    mar_hist: pass a list that persists across calls to apply the same MAR-masking
+    used during training (_is_masked). Required for eyes_closed to be predictable.
     Returns (features: list[float], lm_points: list) or (None, None) if no face.
     """
     from .visual_features import EYE_MOUTH_INDICES
@@ -313,8 +315,16 @@ def extract_frame(frame_bgr: np.ndarray, landmarker: FaceLandmarker):
     if not result.face_landmarks:
         return None, None
     lm    = result.face_landmarks[0]
+    mar   = _mar(lm, _MOUTH)
+    if mar_hist is not None:
+        masked = _is_masked(mar_hist)
+        if not masked and not np.isnan(mar):
+            mar_hist.append(mar)
+            if len(mar_hist) > _MASK_WINDOW:
+                mar_hist.pop(0)
+        mar = np.nan if masked else mar
     feats = [
-        _ear(lm, _LEFT_EYE), _ear(lm, _RIGHT_EYE), _mar(lm, _MOUTH),
+        _ear(lm, _LEFT_EYE), _ear(lm, _RIGHT_EYE), mar,
         *_head_pose(lm, fw, fh),
         lm[1].x, lm[1].y,
     ]
