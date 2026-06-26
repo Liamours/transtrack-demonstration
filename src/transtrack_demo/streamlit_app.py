@@ -146,12 +146,14 @@ def main():
         p.set_log(_new_log_path())
         return p
 
-    ctx = webrtc_streamer(
-        key="fatigue",
-        video_processor_factory=make_processor,
-        rtc_configuration=_RTC_CONFIG,
-        media_stream_constraints={"video": True, "audio": False},
-    )
+    video_col, _ = st.columns(2)
+    with video_col:
+        ctx = webrtc_streamer(
+            key="fatigue",
+            video_processor_factory=make_processor,
+            rtc_configuration=_RTC_CONFIG,
+            media_stream_constraints={"video": True, "audio": False},
+        )
 
     if ctx.state.playing:
         p = ctx.video_processor
@@ -173,13 +175,14 @@ def main():
 
         _result_panel(proc.result)
 
-        if proc.alarm_event.is_set() and alarm_enabled:
+        if proc.alarm_event.is_set():
             proc.alarm_event.clear()
-            st.session_state.alarm_idx += 1
-            components.html(
-                alarm_js_html(alarm_wav_bytes(), st.session_state.alarm_idx),
-                height=0,
-            )
+            if alarm_enabled:
+                st.session_state.alarm_idx += 1
+                components.html(
+                    alarm_js_html(alarm_wav_bytes(), st.session_state.alarm_idx),
+                    height=0,
+                )
 
     live_panel()
 
