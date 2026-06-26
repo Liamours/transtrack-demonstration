@@ -155,7 +155,12 @@ class FatigueProcessor(VideoProcessorBase):
             f = list(self._buf)[-1]
             ear_l, ear_r, mar = f[0], f[1], f[2]
             ear = None if (np.isnan(ear_l) and np.isnan(ear_r)) else float(np.nanmean([ear_l, ear_r]))
-            draw_ear_mar(out, {"ear": ear, "mar": None if np.isnan(float(mar)) else float(mar)})
+            # Use last raw MAR from history when current frame is masked (stable mouth)
+            if np.isnan(float(mar)) and self._mar_hist:
+                mar_display = float(self._mar_hist[-1])
+            else:
+                mar_display = None if np.isnan(float(mar)) else float(mar)
+            draw_ear_mar(out, {"ear": ear, "mar": mar_display})
         draw_stats(out, self._stats)
         self.zoom_frame = zoom_landmark_region(out, self._last_lm or [])
 
